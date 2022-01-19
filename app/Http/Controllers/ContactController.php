@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Imports\ContactsImport;
 use App\Models\Contact;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Response;
+use Excel;
 
 class ContactController extends Controller
 {
@@ -28,7 +31,7 @@ class ContactController extends Controller
      */
     public function create()
     {
-        $contactLists = Http::get('https://a.klaviyo.com/api/v2/lists?api_key=pk_81c9f2bf0ce5176814fee9cad0f42b2c3d');
+        $contactLists = Http::get('https://a.klaviyo.com/api/v2/lists?api_key=' . env('KLAVIYO_KEY'));
         $lists = [];
         if ($contactLists->successful()) {
             $lists = $contactLists->json();
@@ -52,7 +55,7 @@ class ContactController extends Controller
             'list_id' => 'required|string',
         ]);
 
-        $existRes = Http::post('https://a.klaviyo.com/api/v2/list/' . $request->list_id . '/get-members?api_key=pk_81c9f2bf0ce5176814fee9cad0f42b2c3d', [
+        $existRes = Http::post('https://a.klaviyo.com/api/v2/list/' . $request->list_id . '/get-members?api_key=' . env('KLAVIYO_KEY'), [
             'emails' => [
                 $request->email
             ],
@@ -65,7 +68,7 @@ class ContactController extends Controller
         if ($existRes->successful()) {
             if (count($existRes->json()) > 0) {
                 //update
-                $updateRes = Http::put('https://a.klaviyo.com/api/v1/person/' . $existRes[0]['id'] . '?first_name=' . $request->first_name . '&email=' . $request->email . '&phone_number=' . $request->phone . '&api_key=pk_81c9f2bf0ce5176814fee9cad0f42b2c3d');
+                $updateRes = Http::put('https://a.klaviyo.com/api/v1/person/' . $existRes[0]['id'] . '?first_name=' . $request->first_name . '&email=' . $request->email . '&phone_number=' . $request->phone . '&api_key=' . env('KLAVIYO_KEY'));
                 if ($updateRes->successful()) {
                     $contact = new Contact();
                     $contact->first_name = $request->first_name;
@@ -79,7 +82,7 @@ class ContactController extends Controller
                 }
             } else {
                 //create
-                $createRes = Http::post('https://a.klaviyo.com/api/v2/list/' . $request->list_id . '/members?api_key=pk_81c9f2bf0ce5176814fee9cad0f42b2c3d', [
+                $createRes = Http::post('https://a.klaviyo.com/api/v2/list/' . $request->list_id . '/members?api_key=' . env('KLAVIYO_KEY'), [
                     'profiles' => [
                         'email' => $request->email,
                         'phone_number' => $request->phone,
@@ -112,7 +115,7 @@ class ContactController extends Controller
      */
     public function edit($id)
     {
-        $contactLists = Http::get('https://a.klaviyo.com/api/v2/lists?api_key=pk_81c9f2bf0ce5176814fee9cad0f42b2c3d');
+        $contactLists = Http::get('https://a.klaviyo.com/api/v2/lists?api_key=' . env('KLAVIYO_KEY'));
         $lists = [];
         if ($contactLists->successful()) {
             $lists = $contactLists->json();
@@ -139,11 +142,11 @@ class ContactController extends Controller
 
         $contact = Contact::find($id);
 
-        $updateRes = Http::put('https://a.klaviyo.com/api/v1/person/' . $contact->profile_id . '?first_name=' . $request->first_name . '&email=' . $request->email . '&phone_number=' . $request->phone . '&api_key=pk_81c9f2bf0ce5176814fee9cad0f42b2c3d');
+        $updateRes = Http::put('https://a.klaviyo.com/api/v1/person/' . $contact->profile_id . '?first_name=' . $request->first_name . '&email=' . $request->email . '&phone_number=' . $request->phone . '&api_key=' . env('KLAVIYO_KEY'));
 
         if ($request->list_id != $contact->list_id) {
             //delete from existing list and assign to new list
-            $deleteRes = Http::delete('https://a.klaviyo.com/api/v2/list/' . $contact->list_id . '/members?api_key=pk_81c9f2bf0ce5176814fee9cad0f42b2c3d', [
+            $deleteRes = Http::delete('https://a.klaviyo.com/api/v2/list/' . $contact->list_id . '/members?api_key=' . env('KLAVIYO_KEY'), [
                 'emails' => [
                     $request->email
                 ],
@@ -152,7 +155,7 @@ class ContactController extends Controller
                 ]
             ]);
             if ($deleteRes->successful()) {
-                $createRes = Http::post('https://a.klaviyo.com/api/v2/list/' . $request->list_id . '/members?api_key=pk_81c9f2bf0ce5176814fee9cad0f42b2c3d', [
+                $createRes = Http::post('https://a.klaviyo.com/api/v2/list/' . $request->list_id . '/members?api_key=' . env('KLAVIYO_KEY'), [
                     'profiles' => [
                         'email' => $request->email,
                         'phone_number' => $request->phone,
@@ -171,5 +174,65 @@ class ContactController extends Controller
             session()->flash('success', 'Contact has been updated successfully !!');
         }
         return redirect()->route('contacts.index');
+    }
+
+    public function exportContacts()
+    {
+        $contacts = Contact::where('user_id', auth()->id())
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $now = date('Y-m-d H:i:s');
+        $headers = array(
+            "Content-type" => "text/csv",
+            "Content-Disposition" => "attachment; filename=contacts$now.csv",
+            "Pragma" => "no-cache",
+            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
+            "Expires" => "0"
+        );
+
+        $columns = [
+            'First Name',
+            'Email',
+            'Phone Number'
+        ];
+
+        $callback = function () use ($contacts, $columns) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+
+            foreach ($contacts as $contact) {
+                fputcsv($file, [
+                    $contact->first_name,
+                    $contact->email,
+                    $contact->phone
+                ]);
+            }
+            fclose($file);
+        };
+        return Response::stream($callback, 200, $headers);
+    }
+
+    public function importContacts(Request $request)
+    {
+        Excel::import(new ContactsImport, $request->file('file'));
+        return redirect()->back();
+    }
+
+    public function trackKlaviyo(Request $request)
+    {
+        $client = new \GuzzleHttp\Client();
+
+        $response = $client->request('POST', 'https://a.klaviyo.com/api/track', [
+            'form_params' => [
+                'data' => '{"token": "' . env('KLAVIYO_KEY') . '", "event": "Ordered Product", "customer_properties": {"$email": "abraham.lincoln@klaviyo.com"}, "properties": {"item_name": "Boots","$value": 100}}'
+            ],
+            'headers' => [
+                'Accept' => 'text/html',
+                'Content-Type' => 'application/x-www-form-urlencoded',
+            ],
+        ]);
+
+        return redirect()->back();
     }
 }

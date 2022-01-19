@@ -37,5 +37,23 @@
         <script type="text/javascript" src="https://code.jquery.com/jquery-3.4.1.slim.js"></script>
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/parsley.js/2.9.2/parsley.min.js"></script>
         <script type="text/javascript" src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.js"></script>
+        <script>
+            $(document).ready(function() {
+                $('#btnImport').click(function () {
+                    $('#file').click();
+                });
+                $('#file').change(function () {
+                    let file = $(this).prop('files')[0];
+
+                    if (typeof file !== "undefined") {
+                        $('#form').submit();
+                    }
+                });
+
+                $('#btnTrack').click(function () {
+                    $('#klaviyoForm').submit();
+                });
+            })
+        </script>
     </body>
 </html>

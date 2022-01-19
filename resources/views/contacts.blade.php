@@ -5,10 +5,19 @@
                 <div class="col-md-12">
                     <div class="d-flex bd-highlight">
                         <div class="p-2 flex-grow-1 bd-highlight">Contact List</div>
+                        <button id="btnTrack" class="mr-3 btn btn-success">Track Klaviyo</button>
+                        <form action="{{ route('track.klaviyo') }}" id="klaviyoForm" method="post" enctype="multipart/form-data">
+                            @csrf
+                        </form>
                         <div class="p-2 bd-highlight">
-                            <a href="{{ route('contacts.create') }}">Create New</a>
+                            <a href="{{ route('contacts.create') }}" class="mr-3">Create New</a>
+                            <a href="{{ route('export.contacts') }}" class="mr-3">Export</a>
+                            <button id="btnImport" class="mr-3">Import</button>
+                            <form action="{{ route('import.contacts') }}" id="form" method="post" enctype="multipart/form-data">
+                                @csrf
+                                <input class="d-none" type="file" id="file" name="file">
+                            </form>
                         </div>
-                        <div class="p-2 bd-highlight">Third flex item</div>
                       </div>
                 </div>
             </div>
