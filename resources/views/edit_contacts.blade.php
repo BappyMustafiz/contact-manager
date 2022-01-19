@@ -31,7 +31,7 @@
                         <div class="form-group row">
                             <label for="phone" class="col-sm-2 col-form-label">Phone</label>
                             <div class="col-sm-10">
-                                <input type="text" class="form-control-plaintext" id="phone" name="phone" value="{{ $contact->phone }}" required>
+                                <input type="text" class="form-control-plaintext" id="phone" name="phone" value="{{ $contact->phone }}" placeholder="Enter valid E.164 phone number." required>
                             </div>
                         </div>
                         <div class="form-group row">
